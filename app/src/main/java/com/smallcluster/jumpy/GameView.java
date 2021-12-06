@@ -1,5 +1,6 @@
 package com.smallcluster.jumpy;
 
+import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -7,8 +8,14 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.media.MediaPlayer;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
@@ -17,7 +24,7 @@ Le jeu est est créé pour fonctionner sur une zone de 1280x720 pixels,
 l'affichage est redimensionné en conservant le ratio.
  */
 
-public class GameView extends SurfaceView implements SurfaceHolder.Callback, Runnable {
+public class GameView extends SurfaceView implements SurfaceHolder.Callback, Runnable, SensorEventListener {
 
     private Paint paint = new Paint();
 
@@ -42,17 +49,24 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     private Bitmap NUAGE_BMP = BitmapFactory.decodeResource(getResources(), R.drawable.nuage);
     private Bitmap SOL_BMP = BitmapFactory.decodeResource(getResources(), R.drawable.sol);
 
+    // ------------------ AUDIO ------------------
+    MediaPlayer musiqueFond;
+
+
     // ------------------------ MONDE --------------
-
-
 
     private float vitesse = 250; // en pixels/s
     private float decalageSol = 0;
     private float decalageCollines = 0;
     private float decalageNuage = 0;
+    private float solPos = 600;
+    private float grav = 2000;
+    private float accelx = 0;
+    private Joueur joueur = new Joueur(138, 482);
 
 
-    public void init(){
+
+    public void init(Context c){
         setFocusable(true);
         SurfaceHolder holder = getHolder();
         holder.addCallback(this);
@@ -70,6 +84,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         // sol
         c.drawBitmap(SOL_BMP, -decalageSol, 581, null);
         c.drawBitmap(SOL_BMP, -decalageSol+1280, 581, null);
+
+
+        // Joueur
+        joueur.render(c);
 
         // nuage
         c.drawBitmap(NUAGE_BMP, 18-decalageNuage, 34, null);
@@ -95,6 +113,36 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         decalageNuage += vitesse*1.5f*delta;
         if(decalageNuage >= 1280)
             decalageNuage = 0;
+
+        // --------------- Joueur ----------------
+
+        // gravité
+        if(!joueur.surLeSol){
+            joueur.vy += grav * delta;
+        }
+
+        // Accéléromètre
+        joueur.x += accelx * delta;
+
+        // Intégration implicite d'Euler
+        joueur.y += joueur.vy * delta;
+        joueur.x += joueur.vx * delta;
+
+        // Contact avec le sol
+        if(joueur.y + joueur.h/2.0f > solPos){
+            joueur.y = solPos - joueur.h/2;
+            joueur.vy = 0;
+            joueur.surLeSol = true;
+        }
+
+        // Contact avec les bords de l'écran
+        if(joueur.x - joueur.w/2.0f <= 0){
+            joueur.x = joueur.w/2.0f;
+            joueur.vx = 0;
+        } else if(joueur.x + joueur.w/2.0f >= 1280) {
+            joueur.x = 1280-joueur.w/2.0f;
+            joueur.vx = 0;
+        }
 
     }
 
@@ -136,6 +184,11 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         if (updateThread == null){
             return;
         }
+        // coupe la musique
+        musiqueFond.stop();
+        musiqueFond = null;
+
+        // coupe le thread
         updating = false;
         while (true){
             try{
@@ -146,10 +199,18 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             }
         }
         updateThread = null;
+
+
     }
 
     public void startUpdateThread(){
         if (surfaceReady && updateThread == null){
+
+            // lance la  musique
+            musiqueFond = MediaPlayer.create(getContext(), R.raw.main_music_2);
+            musiqueFond.setLooping(true);
+            musiqueFond.start();
+
             updateThread = new Thread(this, "Game thread");
             updating = true;
             updateThread.start();
@@ -158,20 +219,20 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
 
     public GameView(Context context) {
         super(context);
-        init();
+        init(context);
     }
 
     public GameView(Context context, AttributeSet attrs) {
         super(context, attrs);
-        init();
+        init(context);
     }
     public GameView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        init();
+        init(context);
     }
     public GameView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
-        init();
+        init(context);
     }
 
     @Override
@@ -211,5 +272,64 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
                 delta = frameTime / 1000.0f;
             }
         }
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        if (event.sensor.getType() != Sensor.TYPE_ACCELEROMETER)
+            return;
+        int rotation = ((Activity) getContext()).getWindowManager().getDefaultDisplay().getRotation();
+        switch (rotation) {
+            case Surface.ROTATION_0:
+                accelx = -event.values[0]*200.0f;
+                break;
+            case Surface.ROTATION_90:
+                accelx = event.values[1]*200.0f;
+                break;
+            case Surface.ROTATION_180:
+                accelx = event.values[0]*200.0f;
+                break;
+            case Surface.ROTATION_270:
+                accelx = -event.values[1]*200.0f;
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int i) {
+
+    }
+}
+
+class Rectangle {
+    public float x,y,w,h;
+    public Rectangle(float x, float y, float w, float h){
+        this.x = x;
+        this.y = y;
+        this.w = w;
+        this.h = h;
+    }
+
+    public boolean collision(Rectangle autre){
+        return !(autre.x-autre.w/2 > x+w/2 || autre.x+autre.w/2 < x-w/2 ||
+                 autre.y-autre.h/2 > y+h/2 || autre.y+ autre.h/2 < y-h/2);
+    }
+    public void render(Canvas c){
+        Paint paint = new Paint();
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setColor(Color.RED);
+        paint.setStrokeWidth(2);
+        c.drawRect(x-w/2, y-h/2, x+w/2, y+h/2, paint);
+    }
+}
+
+class Joueur extends Rectangle{
+    public float vx=0, vy=0;
+    public boolean surLeSol = false;
+    public Joueur(float x, float y){
+        super(x,y, 200, 200);
+    }
+    @Override
+    public void render(Canvas c){
+        super.render(c);
     }
 }
