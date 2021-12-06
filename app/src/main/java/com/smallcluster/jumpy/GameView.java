@@ -22,6 +22,7 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
 import java.util.ArrayList;
+import java.util.Timer;
 
 /*
 Le jeu est est créé pour fonctionner sur une zone de 1280x720 pixels,
@@ -351,6 +352,31 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     public void onAccuracyChanged(Sensor sensor, int i) {
 
     }
+
+    class Joueur extends Rectangle{
+
+        public float vx=0, vy=0;
+        public boolean surLeSol = false;
+        private Bitmap avatar = null;
+        private Bitmap corps = BitmapFactory.decodeResource(getResources(), R.drawable.corps_joueur);
+
+        public Joueur(float x, float y){
+            super(x,y, 47, 100);
+        }
+        public void setAvatar(Bitmap avatar){
+            this.avatar = avatar;
+        }
+
+        @Override
+        public void render(Canvas c){
+            if(avatar == null){
+                super.render(c);
+            } else {
+                c.drawBitmap(avatar, x-50, y-150, null);
+            }
+            c.drawBitmap(corps, x-24.5f, y-50, null);
+        }
+    }
 }
 
 class Rectangle {
@@ -375,22 +401,4 @@ class Rectangle {
     }
 }
 
-class Joueur extends Rectangle{
-    public float vx=0, vy=0;
-    public boolean surLeSol = false;
-    private Bitmap avatar = null;
-    public Joueur(float x, float y){
-        super(x,y, 200, 200);
-    }
-    public void setAvatar(Bitmap avatar){
-        this.avatar = avatar;
-    }
-    @Override
-    public void render(Canvas c){
-        if(avatar == null){
-            super.render(c);
-        } else {
-            c.drawBitmap(avatar, x-100, y-100, null);
-        }
-    }
-}
+

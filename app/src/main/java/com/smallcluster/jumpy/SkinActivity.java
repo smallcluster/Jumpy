@@ -5,6 +5,11 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.Rect;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.view.View;
@@ -49,12 +54,24 @@ public class SkinActivity extends AppCompatActivity {
                         } else {
                             crop = Bitmap.createBitmap(finalPhoto, w/2-h/2, 0, h,h);
                         }
+                        Bitmap resized = Bitmap.createScaledBitmap(crop, 100, 100, true);
 
-                        avatar = Bitmap.createScaledBitmap(crop, 200, 200, true);
+                        // TODO : use oval
+                        Bitmap cropCircle = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888);
+                        Canvas canvas = new Canvas(cropCircle);
+                        int color = 0xff424242;
+                        Paint paint = new Paint();
+                        Rect rect = new Rect(0, 0, resized.getWidth(), resized.getHeight());
+                        float r = 50.0f;
+                        paint.setAntiAlias(true);
+                        canvas.drawARGB(0, 0, 0, 0);
+                        paint.setColor(color);
+                        canvas.drawCircle(r, r, r, paint);
+                        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+                        canvas.drawBitmap(resized, rect, rect, paint);
 
-
-
-                        avatarImageView.setImageBitmap(avatar);
+                        avatar = resized;
+                        avatarImageView.setImageBitmap(crop);
                     }
                 }
             });
