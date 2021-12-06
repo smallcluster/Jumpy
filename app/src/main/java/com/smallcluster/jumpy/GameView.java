@@ -12,12 +12,16 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.media.AudioAttributes;
 import android.media.MediaPlayer;
+import android.media.SoundPool;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+
+import java.util.ArrayList;
 
 /*
 Le jeu est est créé pour fonctionner sur une zone de 1280x720 pixels,
@@ -51,6 +55,8 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
 
     // ------------------ AUDIO ------------------
     MediaPlayer musiqueFond;
+    SoundPool sfx;
+    int sfx_saut, sfx_tombe;
 
 
     // ------------------------ MONDE --------------
@@ -59,10 +65,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     private float decalageSol = 0;
     private float decalageCollines = 0;
     private float decalageNuage = 0;
-    private float solPos = 600;
-    private float grav = 2000;
+    private float solPos = 590;
+    private float grav = 12000;
     private float accelx = 0;
-    private Joueur joueur = new Joueur(138, 482);
+    private Joueur joueur = new Joueur(138, 472);
 
 
 
@@ -70,6 +76,17 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         setFocusable(true);
         SurfaceHolder holder = getHolder();
         holder.addCallback(this);
+    }
+
+    public void sauter(){
+        if(joueur.surLeSol){
+            joueur.vy -= 200000*delta;
+            joueur.surLeSol = false;
+            // peut ne pas être initialisé
+            if(sfx != null){
+                sfx.play(sfx_saut, 1, 1, 1, 0, 1.0f);
+            }
+        }
     }
 
     public void render(Canvas c){
@@ -118,21 +135,25 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
 
         // gravité
         if(!joueur.surLeSol){
+            // retombée plus rapide
             joueur.vy += grav * delta;
         }
-
-        // Accéléromètre
-        joueur.x += accelx * delta;
-
         // Intégration implicite d'Euler
         joueur.y += joueur.vy * delta;
         joueur.x += joueur.vx * delta;
 
+        // Accéléromètre -> impulsion et non accélération
+        if(joueur.surLeSol)
+            joueur.x += accelx*delta;
+        else
+            joueur.x += 2*accelx*delta; // plus de contrôles dans les airs
+
         // Contact avec le sol
-        if(joueur.y + joueur.h/2.0f > solPos){
+        if(joueur.y + joueur.h/2.0f >= solPos && !joueur.surLeSol){
             joueur.y = solPos - joueur.h/2;
             joueur.vy = 0;
             joueur.surLeSol = true;
+            sfx.play(sfx_tombe, 1, 1, 1, 0, 1.0f);
         }
 
         // Contact avec les bords de l'écran
@@ -184,9 +205,20 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         if (updateThread == null){
             return;
         }
+
         // coupe la musique
         musiqueFond.stop();
+        musiqueFond.release();
         musiqueFond = null;
+
+
+        // supprimer les sfx
+        sfx.stop(sfx_saut);
+        sfx.stop(sfx_tombe);
+        sfx.unload(sfx_saut);
+        sfx.unload(sfx_tombe);
+        sfx.release();
+        sfx = null;
 
         // coupe le thread
         updating = false;
@@ -206,10 +238,27 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     public void startUpdateThread(){
         if (surfaceReady && updateThread == null){
 
-            // lance la  musique
+            // charge et lance la  musique
             musiqueFond = MediaPlayer.create(getContext(), R.raw.main_music_2);
             musiqueFond.setLooping(true);
             musiqueFond.start();
+
+            // ------------ SFX -------------------
+
+            // Configure un soundPool (pour jouer plusieurs sfx en même temps)
+            AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_GAME)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build();
+
+            sfx = new SoundPool.Builder()
+                    .setAudioAttributes(audioAttributes)
+                    .setMaxStreams(8) // 8 sons possibles en même temps
+                    .build();
+
+            sfx_saut = sfx.load(getContext(), R.raw.saut, 1);
+            sfx_tombe = sfx.load(getContext(), R.raw.tombe, 1);
+
 
             updateThread = new Thread(this, "Game thread");
             updating = true;
