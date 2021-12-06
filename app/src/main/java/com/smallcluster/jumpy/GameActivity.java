@@ -1,6 +1,7 @@
 package com.smallcluster.jumpy;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.hardware.Sensor;
 import android.hardware.SensorManager;
 import android.os.Bundle;
@@ -23,10 +24,16 @@ public class GameActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_game);
         game = findViewById(R.id.gameView);
-
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         sensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         gestureDetector = new GestureDetectorCompat(this, new MyGestureListener());
+
+        // On recup le selfie et on le transmet au joueur de la game view
+        Bundle bundle = getIntent().getExtras();
+        if(bundle != null){
+            Bitmap avatar = (Bitmap) bundle.get("avatar");
+            game.setAvatar(avatar);
+        }
 
     }
 

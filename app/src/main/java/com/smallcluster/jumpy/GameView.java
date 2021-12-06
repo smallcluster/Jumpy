@@ -72,10 +72,14 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
 
 
 
-    public void init(Context c){
+    private void init(Context c){
         setFocusable(true);
         SurfaceHolder holder = getHolder();
         holder.addCallback(this);
+    }
+
+    public void setAvatar(Bitmap avatar){
+        joueur.setAvatar(avatar);
     }
 
     public void sauter(){
@@ -374,11 +378,19 @@ class Rectangle {
 class Joueur extends Rectangle{
     public float vx=0, vy=0;
     public boolean surLeSol = false;
+    private Bitmap avatar = null;
     public Joueur(float x, float y){
         super(x,y, 200, 200);
     }
+    public void setAvatar(Bitmap avatar){
+        this.avatar = avatar;
+    }
     @Override
     public void render(Canvas c){
-        super.render(c);
+        if(avatar == null){
+            super.render(c);
+        } else {
+            c.drawBitmap(avatar, x-100, y-100, null);
+        }
     }
 }
