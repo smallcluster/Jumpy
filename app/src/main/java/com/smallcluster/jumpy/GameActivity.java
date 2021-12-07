@@ -32,7 +32,7 @@ public class GameActivity extends AppCompatActivity {
         Bundle bundle = getIntent().getExtras();
         if(bundle != null){
             Bitmap avatar = (Bitmap) bundle.get("avatar");
-            game.setAvatar(avatar);
+            game.setJoueurVisage(avatar);
         }
 
     }

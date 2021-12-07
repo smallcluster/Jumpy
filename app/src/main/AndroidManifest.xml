@@ -31,12 +31,14 @@
         <activity
             android:name=".GameActivity"
             android:exported="false"
+            android:configChanges="orientation|screenSize"
             android:screenOrientation="landscape">
         </activity>
 
         <activity
             android:name=".SkinActivity"
             android:exported="false"
+            android:configChanges="orientation|screenSize"
             android:screenOrientation="sensor">
         </activity>
     </application>
