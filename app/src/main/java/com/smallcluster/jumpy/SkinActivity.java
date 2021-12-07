@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
@@ -30,7 +31,7 @@ public class SkinActivity extends AppCompatActivity {
 
     ImageView avatarImageView;
     Button photo;
-    Bitmap avatar = null;
+    Bitmap avatar;
 
     // photo intent launcher
     ActivityResultLauncher<Intent> someActivityResultLauncher = registerForActivityResult(
@@ -56,7 +57,8 @@ public class SkinActivity extends AppCompatActivity {
                         }
                         Bitmap resized = Bitmap.createScaledBitmap(crop, 100, 100, true);
 
-                        // TODO : use oval
+                        // TODO : utiliser un crop oval
+                        /*
                         Bitmap cropCircle = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888);
                         Canvas canvas = new Canvas(cropCircle);
                         int color = 0xff424242;
@@ -69,6 +71,7 @@ public class SkinActivity extends AppCompatActivity {
                         canvas.drawCircle(r, r, r, paint);
                         paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
                         canvas.drawBitmap(resized, rect, rect, paint);
+                        */
 
                         avatar = resized;
                         avatarImageView.setImageBitmap(crop);
@@ -81,6 +84,8 @@ public class SkinActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_skin);
         avatarImageView = findViewById(R.id.imageView);
+        avatar = BitmapFactory.decodeResource(getResources(), R.drawable.face);
+        avatarImageView.setImageBitmap(avatar);
         photo = findViewById(R.id.button2);
         photo.setOnClickListener(view -> {
             if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {

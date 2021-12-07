@@ -2,10 +2,13 @@ package com.smallcluster.jumpy;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.ColorFilter;
+import android.graphics.LightingColorFilter;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.hardware.Sensor;
@@ -22,6 +25,7 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
 import java.util.ArrayList;
+import java.util.Random;
 import java.util.Timer;
 
 /*
@@ -32,6 +36,7 @@ l'affichage est redimensionné en conservant le ratio.
 public class GameView extends SurfaceView implements SurfaceHolder.Callback, Runnable, SensorEventListener {
 
     private Paint paint = new Paint();
+    private static final Random RANDOM = new Random();
 
     // contient les bordures de la surface
     private SurfaceHolder holder = null;
@@ -49,15 +54,17 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
 
 
     // --------------- IMAGES ----------------------
-    private Bitmap CIEL_BMP = BitmapFactory.decodeResource(getResources(), R.drawable.ciel);
-    private Bitmap COLLINES_BMP = BitmapFactory.decodeResource(getResources(), R.drawable.collines);
-    private Bitmap NUAGE_BMP = BitmapFactory.decodeResource(getResources(), R.drawable.nuage);
-    private Bitmap SOL_BMP = BitmapFactory.decodeResource(getResources(), R.drawable.sol);
+    private final Bitmap CIEL_BMP = BitmapFactory.decodeResource(getResources(), R.drawable.ciel);
+    private final Bitmap COLLINES_BMP = BitmapFactory.decodeResource(getResources(), R.drawable.collines);
+    private final Bitmap NUAGE_BMP = BitmapFactory.decodeResource(getResources(), R.drawable.nuage);
+    private final Bitmap SOL_BMP = BitmapFactory.decodeResource(getResources(), R.drawable.sol);
+    private final Bitmap BARRIERE_BMP = BitmapFactory.decodeResource(getResources(), R.drawable.barriere);
+    private final Bitmap ANANAS_BMP = BitmapFactory.decodeResource(getResources(), R.drawable.ananas);
 
     // ------------------ AUDIO ------------------
     MediaPlayer musiqueFond;
     SoundPool sfx;
-    int sfx_saut, sfx_tombe;
+    int sfx_saut, sfx_tombe, sfx_blesse, sfx_meurt;
 
 
     // ------------------------ MONDE --------------
@@ -70,7 +77,15 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     private float grav = 12000;
     private float accelx = 0;
     private Joueur joueur = new Joueur(138, 472);
+    private ArrayList<Obstacle> obstacles = new ArrayList<>();
+    private float score = 0;
 
+    private float obstacleDistance = 720;
+
+    public enum ObstacleType {
+        BARRIERE,
+        ANANAS
+    }
 
 
     private void init(Context c){
@@ -108,6 +123,9 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         c.drawBitmap(SOL_BMP, -decalageSol+1280, 581, null);
 
 
+        // Affichage des obsctacles
+        obstacles.forEach(b->b.render(c));
+
         // Joueur
         joueur.render(c);
 
@@ -115,8 +133,13 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         c.drawBitmap(NUAGE_BMP, 18-decalageNuage, 34, null);
         c.drawBitmap(NUAGE_BMP, 18-decalageNuage+1280, 34, null);
 
+
+        // Affichage des fps
         paint.setColor(Color.RED);
         c.drawText("fps: "+(int) (1.0f/delta), 32, 32, paint);
+
+        // Affichage du score
+        c.drawText("score : "+score, 32, 64, paint);
     }
 
     public void update(){
@@ -132,7 +155,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             decalageSol = 0;
 
         // nuage
-        decalageNuage += vitesse*1.5f*delta;
+        decalageNuage += vitesse*0.5f*delta;
         if(decalageNuage >= 1280)
             decalageNuage = 0;
 
@@ -170,6 +193,44 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             joueur.vx = 0;
         }
 
+        // -------------- OBSTACLES ------------------------
+
+        // Ajout d'un obstacle
+        obstacleDistance -= vitesse*delta;
+
+        if(obstacleDistance <= 0){
+            obstacleDistance = 680 + RANDOM.nextFloat()*600;
+            ObstacleType type;
+
+            if(RANDOM.nextInt(2) == 0)
+                type = ObstacleType.BARRIERE;
+            else
+                type = ObstacleType.ANANAS;
+
+            obstacles.add(new Obstacle(type));
+        }
+
+
+        // Actualisation du pool d'obstacles
+        for(Obstacle b : obstacles){
+            b.x -= vitesse*delta; // déplacement avec le décor
+
+            // Collision avec le joueur -> le joueur perd une vie
+            if(b.collision(joueur)){
+                joueur.perdreVie();
+            }
+
+            // disparition de l'obstacle
+            if(b.x+b.w/2 <= 0)
+                b.marquerARetirer();
+
+        }
+        // On vide le pool d'obstacles
+        obstacles.removeIf(Obstacle::aRetirer);
+
+
+        score += (vitesse/100.0f)*delta;
+        vitesse += 10*delta;
     }
 
     @Override
@@ -222,6 +283,8 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         sfx.stop(sfx_tombe);
         sfx.unload(sfx_saut);
         sfx.unload(sfx_tombe);
+        sfx.unload(sfx_blesse);
+        sfx.unload(sfx_meurt);
         sfx.release();
         sfx = null;
 
@@ -263,6 +326,8 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
 
             sfx_saut = sfx.load(getContext(), R.raw.saut, 1);
             sfx_tombe = sfx.load(getContext(), R.raw.tombe, 1);
+            sfx_blesse = sfx.load(getContext(), R.raw.blesse, 1);
+            sfx_meurt = sfx.load(getContext(), R.raw.meurt, 1);
 
 
             updateThread = new Thread(this, "Game thread");
@@ -349,16 +414,17 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     }
 
     @Override
-    public void onAccuracyChanged(Sensor sensor, int i) {
-
-    }
+    public void onAccuracyChanged(Sensor sensor, int i) {}
 
     class Joueur extends Rectangle{
-
         public float vx=0, vy=0;
         public boolean surLeSol = false;
         private Bitmap avatar = null;
         private Bitmap corps = BitmapFactory.decodeResource(getResources(), R.drawable.corps_joueur);
+        private int vie = 3;
+
+        private boolean invincible = false;
+
 
         public Joueur(float x, float y){
             super(x,y, 47, 100);
@@ -367,17 +433,87 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             this.avatar = avatar;
         }
 
+        public boolean estMort(){
+            return vie <= 0;
+        }
+
+        public void perdreVie(){
+            if(invincible) return;
+            vie--;
+            if(vie <= 0){
+                invincible = true;
+                sfx.play(sfx_meurt, 1, 1, 1, 0, 1);
+                return;
+            }
+            invincible = true; // on rend invincible le joueur
+            sfx.play(sfx_blesse, 1, 1, 1, 0, 1);
+
+            // Joueur invincible pendant 1 seconde
+            Thread timer = new Thread(()->{
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                invincible = false;
+            });
+            timer.setDaemon(true);
+            timer.start();
+        }
+
         @Override
         public void render(Canvas c){
+            Paint paint = new Paint();
+
+            if(invincible){
+                ColorFilter filter = new LightingColorFilter(Color.RED, 0);
+                paint.setColorFilter(filter);
+            }
+
             if(avatar == null){
                 super.render(c);
             } else {
-                c.drawBitmap(avatar, x-50, y-150, null);
+                c.drawBitmap(avatar, x-50, y-150, paint);
             }
-            c.drawBitmap(corps, x-24.5f, y-50, null);
+
+            c.drawBitmap(corps, x-24.5f, y-50, paint);
+        }
+    }
+
+    class Obstacle extends Rectangle {
+        private Bitmap sprite;
+        private boolean retirer = false;
+
+        public boolean aRetirer(){
+            return retirer;
+        }
+        public void marquerARetirer(){
+            retirer = true;
+        }
+        public Obstacle(ObstacleType type){
+            super(1280,0, 0, 0);
+            if(type == ObstacleType.BARRIERE){
+                x = 1280;
+                y = 348;
+                sprite = BARRIERE_BMP;
+            } else if(type == ObstacleType.ANANAS) {
+                x = 1280;
+                y = 470;
+                sprite = ANANAS_BMP;
+            }
+            w = sprite.getWidth();
+            h = sprite.getHeight();
+            x+=w/2.0f;
+            y+=h/2.0f;
+        }
+        @Override
+        public void render(Canvas c){
+            c.drawBitmap(sprite, x-w/2, y-h/2, null);
         }
     }
 }
+
+
 
 class Rectangle {
     public float x,y,w,h;
