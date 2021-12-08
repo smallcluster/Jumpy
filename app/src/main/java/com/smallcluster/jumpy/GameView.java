@@ -164,15 +164,22 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         c.drawBitmap(bmpManager.NUAGE, 18-decalageNuage+1280, 34, null);
 
 
-        // Affichage des fps
 
-        paint.setColor(Color.RED);
-        paint.setTextSize(72);
+
+
+        // Affichage des vies du joueur
+        for(int i=0; i < joueur.getVie(); i++){
+            c.drawBitmap(bmpManager.COEUR, i*bmpManager.COEUR.getWidth(), 0, null);
+        }
+
+
 
         // Affichage du score
+        paint.setColor(Color.RED);
+        paint.setTextSize(64);
         String scoreText = scoreString+" "+ (int) score;
         float cx = c.getWidth()/2.0f - paint.measureText(scoreText)/2.0f;
-        float cy =  32-(paint.descent() + paint.ascent());
+        float cy =  22-(paint.descent() + paint.ascent());
         c.drawText(scoreText, cx, cy, paint);
 
         // Fondu en ouverture lors du lancement du jeu

@@ -8,7 +8,7 @@ import android.graphics.BitmapFactory;
 import com.smallcluster.jumpy.R;
 
 public class BMPManager {
-    public final Bitmap SOL, CIEL, NUAGE, COLLINES, TETE, CORPS, BARRIERE, ANANAS;
+    public final Bitmap SOL, CIEL, NUAGE, COLLINES, TETE, CORPS, BARRIERE, ANANAS, COEUR;
     public BMPManager(Context c){
         Resources res = c.getResources();
         SOL = BitmapFactory.decodeResource(res, R.drawable.sol);
@@ -19,5 +19,6 @@ public class BMPManager {
         CORPS = BitmapFactory.decodeResource(res, R.drawable.corps_joueur);
         BARRIERE = BitmapFactory.decodeResource(res, R.drawable.barriere);
         ANANAS = BitmapFactory.decodeResource(res, R.drawable.ananas);
+        COEUR = BitmapFactory.decodeResource(res, R.drawable.coeur);
     }
 }
