@@ -164,15 +164,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         c.drawBitmap(bmpManager.NUAGE, 18-decalageNuage+1280, 34, null);
 
 
-
-
-
         // Affichage des vies du joueur
         for(int i=0; i < joueur.getVie(); i++){
             c.drawBitmap(bmpManager.COEUR, i*bmpManager.COEUR.getWidth(), 0, null);
         }
-
-
 
         // Affichage du score
         paint.setColor(Color.RED);
