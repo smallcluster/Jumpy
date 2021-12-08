@@ -18,12 +18,16 @@ public class Joueur extends Sprite {
     private boolean surLeSol = false;
     private boolean demandeSaut = false;
 
+    private final Rectangle collisioncorps;
+
 
     public Joueur(float x, float y, SFXManager sfxManager, BMPManager bmpManager, ObstacleManager obstacleManager) {
         super(x, y, bmpManager.CORPS);
+        //width = 12; // la collision se limite au corps
         textureTete = bmpManager.TETE;
         this.sfxManager = sfxManager;
         this.obstacleManager = obstacleManager;
+        this.collisioncorps = new Rectangle(x,y, 47, bmpManager.CORPS.getHeight());
     }
 
     public void setTextureTete(Bitmap tete) {
@@ -64,7 +68,7 @@ public class Joueur extends Sprite {
         // L'utilisateur souhaite faire sauter le joueur
         if (!estMort() && demandeSaut) {
             sfxManager.play(sfxManager.SAUT);
-            vy -= 200000 * delta;
+            vy -= 200000 * 0.016f;
             surLeSol = false;
             demandeSaut = false;
         }
@@ -89,8 +93,8 @@ public class Joueur extends Sprite {
 
         // Contact avec le sol
         float solPos = 590;
-        if (y + height / 2.0f >= solPos && !surLeSol) {
-            y = solPos - height / 2;
+        if (y + collisioncorps.height / 2.0f >= solPos && !surLeSol) {
+            y = solPos - collisioncorps.height / 2;
             vy = 0;
             surLeSol = true;
             sfxManager.play(sfxManager.TOMBE);
@@ -105,9 +109,13 @@ public class Joueur extends Sprite {
             vx = 0;
         }
 
+        // actualiser la position de la collision de son corps
+        collisioncorps.x = x;
+        collisioncorps.y = y;
+
         // collision avec les obstacles -> perte d'une vie
         // effectif seulement si le timer d'invincibilité est terminé
-        if (!estMort() && !degatsSubit && obstacleManager.collision(this)) {
+        if (!estMort() && !degatsSubit && obstacleManager.collision(collisioncorps)) {
             perdreVie();
         }
     }
@@ -117,12 +125,13 @@ public class Joueur extends Sprite {
         degatsSubit = true;
         if (estMort()) {
             sfxManager.play(sfxManager.MEURT);
-
-            // On change la hitbox
+            // On change les hitbox
             float tmp = width;
-
             width = height;
             height = tmp;
+            tmp = collisioncorps.width;
+            collisioncorps.width = collisioncorps.height;
+            collisioncorps.height = tmp;
             surLeSol = false;
 
             return;

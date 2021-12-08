@@ -17,6 +17,7 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
 import com.smallcluster.jumpy.jeu.BMPManager;
+import com.smallcluster.jumpy.jeu.FonduNoir;
 import com.smallcluster.jumpy.jeu.Joueur;
 import com.smallcluster.jumpy.jeu.ObstacleManager;
 import com.smallcluster.jumpy.jeu.SFXManager;
@@ -28,8 +29,12 @@ l'affichage est redimensionné en conservant le ratio.
 
 public class GameView extends SurfaceView implements SurfaceHolder.Callback, Runnable, SensorEventListener {
 
-    private final Paint paint = new Paint();
+    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
+    private final String scoreString = getContext().getString(R.string.score);
+    private final String gameOverString = getContext().getString(R.string.gameOver);
+
+    private Bitmap photo;
     // contient les bordures de la surface
     private SurfaceHolder holder = null;
     // thread du jeu
@@ -47,17 +52,25 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     private float decalageSol = 0;
     private float decalageCollines = 0;
     private float decalageNuage = 0;
-    private final float solPos = 590;
-    private final float grav = 12000;
     private float accelx = 0;
 
     private MediaPlayer musiqueFond;
+    private MediaPlayer musiqueGameover;
+
+
     private BMPManager bmpManager;
     private SFXManager sfxManager;
     private Joueur joueur;
     private ObstacleManager obstacleManager;
 
+    // score
     private float score = 0;
+    private float infoAlphaTime = 0;
+
+
+    private FonduNoir fonduDebut;
+    private FonduNoir fonduFin;
+
 
     private void init(Context c){
         setFocusable(true);
@@ -67,6 +80,8 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         sfxManager = new SFXManager(c);
         obstacleManager = new ObstacleManager(bmpManager);
         joueur = new Joueur(138, 472, sfxManager, bmpManager, obstacleManager);
+        fonduDebut = new FonduNoir(2, false);
+        fonduFin = new FonduNoir(2, true);
     }
 
     public void sauter(){
@@ -74,10 +89,57 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     }
 
     public void setJoueurVisage(Bitmap tete){
-        joueur.setTextureTete(tete);
+        photo = tete;
+        joueur.setTextureTete(photo);
     }
 
+    private float linearLoop(float t){
+        return  t < 0.5f ? 2*t : 1-2*t;
+    }
+
+    public void rejouer(){
+
+        if(!fonduFin.estFini()) return;
+        // On réinitialise le jeu
+        obstacleManager = new ObstacleManager(bmpManager);
+        joueur = new Joueur(138, 472, sfxManager, bmpManager, obstacleManager);
+        joueur.setTextureTete(photo);
+        fonduDebut = new FonduNoir(2, false);
+        fonduFin = new FonduNoir(2, true);
+        vitesse = 250; // en pixels/s
+        decalageSol = 0;
+        decalageCollines = 0;
+        decalageNuage = 0;
+        score = 0;
+        musiqueGameover.pause();
+        musiqueFond.start();
+    }
+
+
+
     public void dessiner(Canvas c){
+
+        // screen de fin
+        if(fonduFin.estFini()){
+            c.drawRGB(0,0,0);
+            // Affichage du score
+            paint.setColor(Color.RED);
+            paint.setTextSize(72);
+            String scoreText = scoreString+" "+ (int) score;
+            float scoreH = paint.descent() + paint.ascent();
+            float cx = c.getWidth()/2.0f - paint.measureText(scoreText)/2.0f;
+            float cy = c.getHeight()/2.0f - scoreH / 2.0f;
+            c.drawText(scoreText, cx, cy, paint);
+
+            // Affichage info pour rejouer
+            paint.setTextSize(45);
+            paint.setColor(Color.argb(linearLoop(infoAlphaTime), 1, 1, 1));
+            String info = gameOverString;
+            float infoX = c.getWidth()/2.0f - paint.measureText(info)/2.0f;
+            float infoY = c.getHeight()/2.0f - scoreH + 24 - (paint.descent() + paint.ascent()) / 2.0f;
+            c.drawText(info, infoX, infoY, paint);
+            return;
+        }
 
         // ciel fixe
         c.drawBitmap(bmpManager.CIEL, 0, 0, null);
@@ -103,14 +165,55 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
 
 
         // Affichage des fps
+
         paint.setColor(Color.RED);
-        c.drawText("fps: "+(int) (1.0f/delta), 32, 32, paint);
+        paint.setTextSize(72);
 
         // Affichage du score
-        c.drawText("score : "+score, 32, 64, paint);
+        String scoreText = scoreString+" "+ (int) score;
+        float cx = c.getWidth()/2.0f - paint.measureText(scoreText)/2.0f;
+        float cy =  32-(paint.descent() + paint.ascent());
+        c.drawText(scoreText, cx, cy, paint);
+
+        // Fondu en ouverture lors du lancement du jeu
+        fonduDebut.dessiner(c);
+
+        // Le joueur est mort -> fondu en fermeture
+        if(joueur.estMort())
+            fonduFin.dessiner(c);
+
+
     }
 
     public void actualiser(){
+
+        // La partie est terminée.
+        if(fonduFin.estFini()){
+            // Gestion du timer du clignottement du texte.
+            infoAlphaTime += delta;
+            if(infoAlphaTime >= 1)
+                infoAlphaTime = 0;
+            return;
+        }
+
+
+        // Le joueur est mort -> fondu en fermeture
+        if(joueur.estMort()){
+            fonduFin.actualiser(delta);
+            // On change de musique
+            if(!musiqueGameover.isPlaying()){
+                musiqueGameover.start();
+
+                // Pause et remise au début
+                musiqueFond.pause();
+                musiqueFond.seekTo(0);
+            }
+
+        }
+
+        // Fondu en ouverture lors du lancement du jeu
+        fonduDebut.actualiser(delta);
+
         // --------- PARALLAX -------------
         // collines
         decalageCollines += vitesse*0.25f*delta;
@@ -134,7 +237,9 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
 
         joueur.actualiser(delta, accelx);
 
-        score += (vitesse/100.0f)*delta;
+        if(!joueur.estMort())
+            score += delta*vitesse/100.0f;
+
         vitesse += 10*delta;
     }
 
@@ -154,6 +259,22 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         }
         surfaceReady = true;
         startUpdateThread();
+        // charge et lance la  musique
+        musiqueFond = MediaPlayer.create(getContext(), R.raw.main_music_2);
+        musiqueFond.setLooping(true);
+
+        if(!joueur.estMort())
+            musiqueFond.start();
+
+        musiqueGameover = MediaPlayer.create(getContext(), R.raw.gameover);
+        musiqueGameover.setLooping(true);
+
+        if(joueur.estMort())
+            musiqueGameover.start();
+
+        // charge les sons
+        sfxManager = new SFXManager(getContext());
+        joueur.setSfxManager(sfxManager);
     }
 
     @Override
@@ -164,22 +285,25 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         holder.getSurface().release();
         this.holder = null;
         surfaceReady = false;
-    }
-
-    public void stopUpdateThread(){
-        if (updateThread == null){
-            return;
-        }
 
         // coupe la musique
         musiqueFond.stop();
         musiqueFond.release();
         musiqueFond = null;
 
+        musiqueGameover.stop();
+        musiqueGameover.release();
+        musiqueGameover = null;
+
         // coupe les sons
         sfxManager.release();
         sfxManager = null;
+    }
 
+    public void stopUpdateThread(){
+        if (updateThread == null){
+            return;
+        }
 
         // coupe le thread
         updating = false;
@@ -196,17 +320,6 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
 
     public void startUpdateThread(){
         if (surfaceReady && updateThread == null){
-
-            // charge et lance la  musique
-            musiqueFond = MediaPlayer.create(getContext(), R.raw.main_music_2);
-            musiqueFond.setLooping(true);
-            musiqueFond.start();
-
-            // charge les sons
-            sfxManager = new SFXManager(getContext());
-            joueur.setSfxManager(sfxManager);
-
-
             updateThread = new Thread(this, "Game thread");
             updating = true;
             updateThread.start();
@@ -224,10 +337,6 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     }
     public GameView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        init(context);
-    }
-    public GameView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-        super(context, attrs, defStyleAttr, defStyleRes);
         init(context);
     }
 

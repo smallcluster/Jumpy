@@ -58,6 +58,12 @@ public class GameActivity extends AppCompatActivity {
     class MyGestureListener extends GestureDetector.SimpleOnGestureListener {
 
         @Override
+        public boolean onDoubleTap(MotionEvent e) {
+            game.rejouer();
+            return true;
+        }
+
+        @Override
         public boolean onFling(MotionEvent event1, MotionEvent event2, float velocityX, float velocityY) {
             // detection d'un mouvement vert le haut
 
@@ -73,8 +79,7 @@ public class GameActivity extends AppCompatActivity {
             // ie |nx| < sqrt(2)/2
             if(ny < 0 && Math.abs(nx) <= 0.7071067812){
                 // On indique au jeu que l'on souhaite sauter
-                // GameActivity.this.game est l'instance de GameView de la classe parente
-                GameActivity.this.game.sauter();
+                game.sauter();
             }
             return true;
         }

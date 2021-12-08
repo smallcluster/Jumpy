@@ -11,6 +11,7 @@ import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.view.View;
@@ -33,6 +34,10 @@ public class SkinActivity extends AppCompatActivity {
     Button photo;
     Bitmap avatar;
 
+    private MediaPlayer infoSound;
+    private int pos = 0;
+    private Bitmap TETE_DEFAUT;
+
     // photo intent launcher
     ActivityResultLauncher<Intent> someActivityResultLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -42,38 +47,17 @@ public class SkinActivity extends AppCompatActivity {
                     if (result.getResultCode() == Activity.RESULT_OK) {
                         Intent data = result.getData();
                         Bundle bundle = data.getExtras();
-
                         Bitmap finalPhoto = (Bitmap) bundle.get("data");
-
                         int w = finalPhoto.getWidth();
                         int h = finalPhoto.getHeight();
                         int min = Math.min(w,h);
-
                         Bitmap crop = null;
                         if(w == min){
                             crop = Bitmap.createBitmap(finalPhoto, 0, h/2-w/2, w,w);
                         } else {
                             crop = Bitmap.createBitmap(finalPhoto, w/2-h/2, 0, h,h);
                         }
-                        Bitmap resized = Bitmap.createScaledBitmap(crop, 100, 100, true);
-
-                        // TODO : utiliser un crop oval
-                        /*
-                        Bitmap cropCircle = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888);
-                        Canvas canvas = new Canvas(cropCircle);
-                        int color = 0xff424242;
-                        Paint paint = new Paint();
-                        Rect rect = new Rect(0, 0, resized.getWidth(), resized.getHeight());
-                        float r = 50.0f;
-                        paint.setAntiAlias(true);
-                        canvas.drawARGB(0, 0, 0, 0);
-                        paint.setColor(color);
-                        canvas.drawCircle(r, r, r, paint);
-                        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
-                        canvas.drawBitmap(resized, rect, rect, paint);
-                        */
-
-                        avatar = resized;
+                        avatar = Bitmap.createScaledBitmap(crop, 100, 100, true);
                         avatarImageView.setImageBitmap(crop);
                     }
                 }
@@ -84,15 +68,37 @@ public class SkinActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_skin);
         avatarImageView = findViewById(R.id.imageView);
-        avatar = BitmapFactory.decodeResource(getResources(), R.drawable.face);
+
+        TETE_DEFAUT = BitmapFactory.decodeResource(getResources(), R.drawable.face);
+
+        // On récup la photo prise précédemment
+        if(savedInstanceState != null)
+            avatar = (Bitmap) savedInstanceState.getParcelable("photo");
+        else
+            avatar = TETE_DEFAUT;
+
         avatarImageView.setImageBitmap(avatar);
         photo = findViewById(R.id.button2);
+
         photo.setOnClickListener(view -> {
             if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(new String[]{Manifest.permission.CAMERA}, MY_CAMERA_REQUEST_CODE);
             } else {
                 prendrePhoto();
             }
+        });
+
+        Button reset = findViewById(R.id.buttonReset);
+        reset.setOnClickListener(v->{
+            avatar = TETE_DEFAUT;
+            avatarImageView.setImageBitmap(avatar);
+        });
+
+        Button jouer = findViewById(R.id.buttonPlay);
+        jouer.setOnClickListener(v -> {
+            Intent intent = new Intent(this, GameActivity.class);
+            intent.putExtra("avatar", avatar);
+            startActivity(intent);
         });
     }
 
@@ -121,11 +127,32 @@ public class SkinActivity extends AppCompatActivity {
                 Toast.makeText(this, "Permission camera refusée", Toast.LENGTH_LONG).show();
             }
 
-        }}//end onRequestPermissionsResult
+        }}
 
-    public void jouer(View view){
-        Intent intent = new Intent(this, GameActivity.class);
-        intent.putExtra("avatar", avatar);
-        startActivity(intent);
+    @Override
+    protected void onSaveInstanceState(Bundle outState)
+    {
+        super.onSaveInstanceState(outState);
+        // On sauvegarde la photo prise précédemment
+        outState.putParcelable("photo", avatar);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        infoSound = MediaPlayer.create(getBaseContext(), R.raw.info);
+        infoSound.setLooping(true);
+        infoSound.seekTo(pos);
+        infoSound.start();
+
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        infoSound.pause();
+        pos = infoSound.getCurrentPosition();
+        infoSound.release();
+        infoSound = null;
     }
 }
